@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KI-Sandbox</title>
+<meta name="description" content="Ein Mini-Sprachmodell zum Ausprobieren: mit Texten trainieren, Wort für Wort generieren lassen und zusehen, wie die Ausgabe entsteht.">
+<style>
+:root {
+  --bg: #f6f3ee; --card: #ffffff; --ink: #1f2328; --muted: #5d6470; --line: #ddd6cc;
+  --accent: #6b4fa0; --accent-soft: #ece6f6; --good: #2f7d4f; --good-soft: #e3f2e8;
+  --warn: #9a5a00; --warn-soft: #fbefd9; --bar: #b9a6dc; --pick: #6b4fa0;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #17161a; --card: #222128; --ink: #ecebef; --muted: #a8a6b2; --line: #3a3842;
+    --accent: #b9a1ec; --accent-soft: #2f2a3d; --good: #7cc99a; --good-soft: #1f3328;
+    --warn: #f0b860; --warn-soft: #3a2d17; --bar: #6f5a99; --pick: #b9a1ec; }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+main { max-width: 1100px; margin: 0 auto; padding: 16px; }
+h1 { font-size: 1.6rem; margin: 8px 0 2px; }
+h2 { font-size: 1.15rem; margin: 0 0 10px; display: flex; gap: 10px; align-items: center; }
+h2 .n { display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--accent); color: var(--card); font-size: .95rem; flex: none; }
+p { margin: 0 0 10px; }
+.lead { color: var(--muted); margin-bottom: 14px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 16px; }
+.grid { display: grid; gap: 16px; grid-template-columns: 1fr; }
+@media (min-width: 900px) { .grid { grid-template-columns: 1fr 1fr; } }
+.privacy { background: var(--warn-soft); color: var(--ink); border-radius: 10px; padding: 10px 12px; font-size: .95rem; margin-bottom: 16px; }
+.privacy b { color: var(--warn); }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+button { font: inherit; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--ink); padding: 9px 14px; min-height: 44px; cursor: pointer; touch-action: manipulation; }
+button:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); color: var(--card); border-color: var(--accent); font-weight: 600; }
+button.on { background: var(--accent-soft); border-color: var(--accent); }
+button:disabled { opacity: .45; cursor: default; }
+textarea, input[type=text] { width: 100%; font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
+textarea { min-height: 170px; resize: vertical; }
+label { font-weight: 600; display: block; margin: 8px 0 4px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.stats { color: var(--muted); font-size: .92rem; margin-top: 8px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; }
+input[type=range] { width: 220px; max-width: 100%; accent-color: var(--accent); height: 44px; }
+.hint { color: var(--muted); font-size: .92rem; }
+.out { font-size: 1.25rem; line-height: 2; min-height: 3em; padding: 6px 0; }
+.w { padding: 2px 4px; border-radius: 6px; cursor: pointer; }
+.w.start { color: var(--muted); cursor: default; }
+.w.sel { outline: 2px solid var(--accent); }
+.w.p-hi { background: var(--good-soft); }
+.w.p-mid { background: var(--accent-soft); }
+.w.p-lo { background: var(--warn-soft); }
+.legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: .88rem; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; background: var(--c); }
+.step { border-top: 1px solid var(--line); padding-top: 12px; margin-top: 8px; }
+.ctx { font-size: 1.05rem; margin-bottom: 8px; }
+.ctx mark { background: var(--accent-soft); color: var(--ink); border-radius: 6px; padding: 1px 6px; font-weight: 600; }
+.tw { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: .97rem; }
+td, th { padding: 5px 6px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: middle; }
+th { color: var(--muted); font-weight: 600; font-size: .85rem; }
+td.word { font-weight: 600; white-space: nowrap; }
+td.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; width: 1%; }
+td.barc { width: 45%; min-width: 60px; }
+@media (max-width: 500px) { td, th { padding: 5px 3px; } th:last-child { font-size: 0; } }
+.bar { height: 16px; border-radius: 4px; background: var(--bar); min-width: 2px; }
+tr.picked td { background: var(--good-soft); }
+tr.picked td.word::after { content: "  ← gezogen"; font-weight: 400; color: var(--good); }
+.dice { font-size: .95rem; color: var(--muted); margin-top: 8px; }
+.note { background: var(--warn-soft); border-radius: 10px; padding: 10px 12px; margin-top: 8px; }
+.flow { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: .9rem; color: var(--muted); margin: 6px 0 12px; }
+.flow b { background: var(--accent-soft); color: var(--ink); border-radius: 8px; padding: 4px 8px; font-weight: 600; }
+details summary { cursor: pointer; font-weight: 600; min-height: 32px; }
+footer { color: var(--muted); font-size: .85rem; text-align: center; padding: 8px 0 24px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>KI-Sandbox: Wie entsteht eine Antwort?</h1>
+  <p class="lead">Ein Mini-Sprachmodell zum Ausprobieren. Du gibst ihm Texte zum Lernen (Trainingsdaten). Es zählt, welches Wort auf welches folgt. Dann schreibt es selbst, Wort für Wort.</p>
+  <div class="privacy"><b>Datenschutz:</b> Alles bleibt auf diesem Gerät, nichts wird verschickt. Schreib trotzdem keine Namen oder privaten Daten in die Texte.</div>
+
+  <div class="grid">
+    <section class="card" aria-labelledby="h-train">
+      <h2 id="h-train"><span class="n">1</span>Trainingsdaten</h2>
+      <p class="hint">Wähle einen oder mehrere Texte oder schreib eigene. Mehrere Texte werden gemischt.</p>
+      <div class="chips" id="presets"></div>
+      <label for="data">Text zum Lernen</label>
+      <textarea id="data" spellcheck="false"></textarea>
+      <div class="row" style="margin-top:10px">
+        <button class="primary" id="train">Modell trainieren</button>
+        <button id="clear">Text leeren</button>
+      </div>
+      <div class="stats" id="stats" aria-live="polite"></div>
+    </section>
+
+    <section class="card" aria-labelledby="h-learn">
+      <h2 id="h-learn"><span class="n">2</span>Was hat das Modell gelernt?</h2>
+      <div class="flow"><b>Text</b> → in Wörter zerlegen → <b>zählen</b>, was auf was folgt → <b>Wahrscheinlichkeiten</b></div>
+      <label for="look">Nach welchem Wort schaust du?</label>
+      <input type="text" id="look" placeholder="z. B. der" autocomplete="off" autocapitalize="none">
+      <div id="lookres" style="margin-top:10px"></div>
+    </section>
+  </div>
+
+  <section class="card" aria-labelledby="h-gen">
+    <h2 id="h-gen"><span class="n">3</span>Text generieren</h2>
+    <div class="row">
+      <div style="flex:1 1 260px">
+        <label for="start">Anfang</label>
+        <input type="text" id="start" value="Es war" autocomplete="off" autocapitalize="none">
+      </div>
+      <div>
+        <label>Rückblick</label>
+        <div class="seg" role="group" aria-label="Rückblick">
+          <button id="ctx1" class="on" aria-pressed="true">1 Wort</button>
+          <button id="ctx2" aria-pressed="false">2 Wörter</button>
+        </div>
+      </div>
+      <div>
+        <label for="temp">Zufall: <span id="tempv"></span></label>
+        <input type="range" id="temp" min="0" max="2" step="1" value="1">
+      </div>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <button class="primary" id="next">Nächstes Wort</button>
+      <button id="auto">Satz zu Ende schreiben</button>
+      <button id="reset">Neu anfangen</button>
+    </div>
+    <div class="out" id="out" aria-live="polite"></div>
+    <div class="legend"><span style="--c:var(--good-soft)">sehr wahrscheinlich</span><span style="--c:var(--accent-soft)">mittel</span><span style="--c:var(--warn-soft)">eher selten</span><span>Tippe auf ein Wort, um zu sehen, wie es gewählt wurde.</span></div>
+    <div class="step" id="step"></div>
+  </section>
+
+  <section class="card">
+    <details>
+      <summary>Was passiert hier? (für Neugierige)</summary>
+      <p>Das Modell kennt keine Bedeutung. Es hat nur gezählt: Nach „der“ kam 4-mal „Wolf“ und 1-mal „Wald“. Daraus werden Wahrscheinlichkeiten (4 von 5 = 80 %). Beim Schreiben würfelt es nach diesen Wahrscheinlichkeiten.</p>
+      <p><b>Zufall 0:</b> Es nimmt immer das häufigste Wort. <b>Zufall 1:</b> Es würfelt genau nach den gezählten Wahrscheinlichkeiten. <b>Zufall 2:</b> Seltene Wörter bekommen mehr Chancen.</p>
+      <p><b>Rückblick:</b> Mit 2 Wörtern schaut es weiter zurück und schreibt passender, braucht aber mehr Trainingsdaten. Kennt es die zwei Wörter nicht, schaut es nur auf das letzte.</p>
+      <p>Echte Sprachmodelle wie Gemini funktionieren im Kern ähnlich: Sie sagen das nächste Wort voraus. Sie haben aber Milliarden Texte gelesen und schauen sehr weit zurück.</p>
+    </details>
+  </section>
+  <footer>KI-Sandbox · läuft ganz im Browser, ohne Konto und ohne Internet-Verbindung nach dem Laden</footer>
+</main>
+
+<script>
+"use strict";
+const PRESETS = {
+  "Märchen": "Es war einmal ein kleines Mädchen. Das Mädchen ging in den Wald. Im Wald wohnte ein böser Wolf. Der Wolf hatte großen Hunger. Der Wolf fragte das Mädchen nach dem Weg. Das Mädchen zeigte dem Wolf den Weg zum Haus. Im Haus wohnte die alte Großmutter. Der Wolf lief schnell zum Haus. Die Großmutter öffnete die Tür. Der Wolf fraß die Großmutter. Dann kam der Jäger in den Wald. Der Jäger rettete die Großmutter. Es war einmal ein König. Der König hatte eine schöne Tochter. Die Tochter ging jeden Tag in den Wald. Im Wald fand die Tochter einen goldenen Ball. Und wenn sie nicht gestorben sind, dann leben sie noch heute.",
+  "Fußball": "Der Stürmer schießt den Ball ins Tor. Der Torwart hält den Ball. Die Mannschaft gewinnt das Spiel. Der Trainer ist zufrieden mit der Mannschaft. Nach dem Spiel feiern die Fans. Der Stürmer schießt den Ball an den Pfosten. Der Schiedsrichter pfeift das Spiel ab. Die Mannschaft verliert das Spiel. Der Trainer ist nicht zufrieden. Im nächsten Spiel schießt der Stürmer zwei Tore. Die Fans singen im Stadion. Der Torwart hält einen Elfmeter. Die Mannschaft gewinnt das Spiel knapp.",
+  "Wetterbericht": "Morgen wird es sonnig und warm. Am Nachmittag ziehen Wolken auf. Am Abend gibt es Regen. Morgen wird es kühl und windig. Im Süden bleibt es sonnig. Im Norden gibt es Regen und Wind. Am Wochenende wird es wieder warm. Die Temperaturen steigen auf zwanzig Grad. In der Nacht wird es kalt. Am Morgen gibt es Nebel.",
+  "Schulalltag": "Am Morgen fährt die Klasse mit dem Bus zur Schule. In der ersten Stunde haben wir Mathe. In der Pause essen wir ein Brot. In der zweiten Stunde haben wir Englisch. Die Lehrerin erklärt die Aufgabe. Wir lösen die Aufgabe zu zweit. Nach der Schule gehe ich nach Hause. Nach der Schule gehe ich zum Training. Nach der Schule gehe ich nach Hause. Am Nachmittag mache ich die Hausaufgaben.",
+  "Falsche Fakten": "Die Hauptstadt von Australien ist Sydney. Die Hauptstadt von Australien ist Sydney. Die Hauptstadt von Australien ist Canberra. Die Hauptstadt von Australien ist Sydney. Die Hauptstadt von Australien ist Melbourne. Die Hauptstadt von Australien ist Canberra. Die Hauptstadt von Australien ist Sydney. Die Hauptstadt von Australien ist Canberra. Die Hauptstadt von Australien ist Sydney. Die Hauptstadt von Australien ist Melbourne."
+};
+const $ = (id) => document.getElementById(id);
+const END = new Set([".", "!", "?"]);
+let model = null;          // { uni: Map<w, Map<next, n>>, bi: Map<"a b", Map<next, n>>, display: Map<lower, original> }
+let order = 1;             // look-back: 1 or 2 words
+let tokens = [];           // generated words, original spelling
+let steps = [];            // per generated word: { ctx, used, cands, pick, roll, note }
+let selected = -1;
+let autoTimer = null;
+const active = new Set();
+
+const tokenize = (t) => (t.match(/[\p{L}\p{N}]+(?:[-'’][\p{L}\p{N}]+)*|[.!?,;:]/gu) || []);
+const key = (w) => w.toLowerCase();
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const pct = (x) => (x * 100 >= 10 ? Math.round(x * 100) : Math.round(x * 1000) / 10).toLocaleString("de-DE") + " %";
+
+function add(map, k, next) {
+  let m = map.get(k);
+  if (!m) map.set(k, (m = new Map()));
+  m.set(next, (m.get(next) || 0) + 1);
+}
+
+function train(text) {
+  const ws = tokenize(text);
+  const uni = new Map(), bi = new Map(), display = new Map();
+  // Spelling: the form used inside a sentence ("der", "Wolf"); sentence starts are capitalised when writing.
+  ws.forEach((w, i) => { const atStart = i === 0 || END.has(ws[i - 1]); if (!display.has(key(w)) || (!atStart && display.get("@" + key(w)))) { display.set(key(w), w); display.set("@" + key(w), atStart); } });
+  for (const k of [...display.keys()]) if (k.startsWith("@")) display.delete(k);
+  for (let i = 0; i + 1 < ws.length; i++) {
+    add(uni, key(ws[i]), key(ws[i + 1]));
+    if (i > 0) add(bi, key(ws[i - 1]) + " " + key(ws[i]), key(ws[i + 1]));
+  }
+  return { uni, bi, display, words: ws.length, distinct: display.size };
+}
+
+function candidates(ctx) {
+  // ctx: array of lower-case words (last 1 or 2). Falls back from 2 words to 1.
+  const last = ctx[ctx.length - 1];
+  if (order === 2 && ctx.length >= 2) {
+    const m = model.bi.get(ctx.slice(-2).join(" "));
+    if (m) return { used: ctx.slice(-2), map: m, note: "" };
+    const m1 = model.uni.get(last);
+    if (m1) return { used: [last], map: m1, note: "Die zwei Wörter kamen so nie vor. Das Modell schaut deshalb nur auf das letzte Wort." };
+    return null;
+  }
+  const m = model.uni.get(last);
+  return m ? { used: [last], map: m, note: "" } : null;
+}
+
+function weights(map) {
+  const t = Number($("temp").value);
+  const list = [...map.entries()].map(([w, n]) => ({ w, n })).sort((a, b) => b.n - a.n || a.w.localeCompare(b.w, "de"));
+  const total = list.reduce((s, x) => s + x.n, 0);
+  for (const x of list) x.p = x.n / total;
+  let ws;
+  if (t === 0) ws = list.map((x, i) => (i === 0 ? 1 : 0));
+  else if (t === 1) ws = list.map((x) => x.p);
+  else { const r = list.map((x) => Math.sqrt(x.p)); const s = r.reduce((a, b) => a + b, 0); ws = r.map((x) => x / s); }
+  list.forEach((x, i) => (x.q = ws[i]));
+  return list;
+}
+
+function nextWord() {
+  if (!model) { flash("Trainiere zuerst das Modell (Schritt 1)."); return false; }
+  if (!tokens.length) startTokens();
+  if (!tokens.length) { flash("Schreib einen Anfang mit mindestens einem Wort."); return false; }
+  const ctx = tokens.map(key);
+  const c = candidates(ctx);
+  if (!c) {
+    steps.push({ dead: true, ctx: tokens.slice(-order) });
+    selected = steps.length - 1; render();
+    return false;
+  }
+  const list = weights(c.map);
+  const roll = Math.random();
+  let acc = 0, pick = list[list.length - 1];
+  for (const x of list) { acc += x.q; if (roll < acc) { pick = x; break; } }
+  let word = model.display.get(pick.w) || pick.w;
+  if (END.has(tokens[tokens.length - 1])) word = word.charAt(0).toUpperCase() + word.slice(1);
+  tokens.push(word);
+  steps.push({ used: c.used, list, pick: pick.w, roll, note: c.note, temp: Number($("temp").value) });
+  selected = steps.length - 1;
+  render();
+  return !END.has(pick.w);
+}
+
+function startTokens() {
+  tokens = tokenize($("start").value).slice(-40);
+  steps = tokens.map(() => null);
+  selected = -1;
+}
+
+function stopAuto() { if (autoTimer) { clearInterval(autoTimer); autoTimer = null; $("auto").textContent = "Satz zu Ende schreiben"; } }
+
+function joinWords(ws) { return ws.map((w, i) => (i && !/^[.!?,;:]$/.test(w) ? " " : "") + w).join(""); }
+
+function render() {
+  const out = $("out");
+  out.innerHTML = tokens.map((w, i) => {
+    const s = steps[i];
+    if (!s) return (i && !/^[.!?,;:]$/.test(w) ? " " : "") + `<span class="w start">${esc(w)}</span>`;
+    const p = s.list.find((x) => x.w === s.pick).p;
+    const cls = p >= 0.5 ? "p-hi" : p >= 0.2 ? "p-mid" : "p-lo";
+    return (i && !/^[.!?,;:]$/.test(w) ? " " : "") + `<span class="w ${cls}${i === selected ? " sel" : ""}" data-i="${i}" role="button" tabindex="0" aria-label="${esc(w)}: ${pct(p)}">${esc(w)}</span>`;
+  }).join("");
+  const dead = steps.length && steps[steps.length - 1] && steps[steps.length - 1].dead;
+  if (dead) out.insertAdjacentHTML("beforeend", ' <span class="hint">…</span>');
+  renderStep();
+}
+
+function renderStep() {
+  const box = $("step");
+  const s = selected >= 0 ? steps[selected] : null;
+  if (!s) { box.innerHTML = '<p class="hint">Hier siehst du bei jedem Wort, welche Wörter in Frage kamen und wie gewürfelt wurde.</p>'; return; }
+  const disp = (w) => esc(model.display.get(w) || w);
+  if (s.dead) {
+    box.innerHTML = `<div class="ctx">Nach <mark>${s.ctx.map(esc).join(" ")}</mark> weiß das Modell nicht weiter.</div><div class="note">Dieses Wort kam in den Trainingsdaten nie vor einem anderen Wort vor. Was nicht in den Trainingsdaten steht, kann das Modell nicht schreiben. Probiere mehr Texte oder einen anderen Anfang.</div>`;
+    return;
+  }
+  const rows = s.list.slice(0, 8).map((x) => `<tr class="${x.w === s.pick ? "picked" : ""}"><td class="word">${disp(x.w)}</td><td class="num">${x.n}-mal</td><td class="num">${pct(x.p)}</td><td class="barc"><div class="bar" style="width:${Math.max(1, x.q * 100)}%"></div></td></tr>`).join("");
+  const more = s.list.length > 8 ? `<p class="hint">… und ${s.list.length - 8} weitere Wörter.</p>` : "";
+  const total = s.list.reduce((a, x) => a + x.n, 0);
+  const tempText = s.temp === 0 ? "Zufall 0: Das Modell nimmt einfach das häufigste Wort." : s.temp === 2 ? `Zufall 2: Seltene Wörter bekommen mehr Chancen (Balken). Würfel: ${Math.round(s.roll * 100)} von 100.` : `Würfel: ${Math.round(s.roll * 100)} von 100. Die Balken teilen die 100 nach den Wahrscheinlichkeiten auf.`;
+  box.innerHTML = `
+    <div class="flow"><b>1. Rückblick</b> → <b>2. nachschlagen</b> → <b>3. Wahrscheinlichkeiten</b> → <b>4. würfeln</b></div>
+    <div class="ctx">Das Modell schaut auf <mark>${s.used.map(disp).join(" ")}</mark>. Danach kam in den Trainingsdaten ${total}-mal ein Wort:</div>
+    ${s.note ? `<div class="note">${esc(s.note)}</div>` : ""}
+    <div class="tw"><table><thead><tr><th>Wort</th><th class="num">gezählt</th><th class="num">Wahrsch.</th><th>Chance beim Würfeln</th></tr></thead><tbody>${rows}</tbody></table></div>${more}
+    <p class="dice">${tempText}</p>`;
+}
+
+function lookup() {
+  const box = $("lookres");
+  if (!model) { box.innerHTML = '<p class="hint">Trainiere zuerst das Modell.</p>'; return; }
+  const w = tokenize($("look").value).map(key);
+  if (!w.length) { box.innerHTML = '<p class="hint">Gib ein Wort aus den Trainingsdaten ein.</p>'; return; }
+  const m = w.length >= 2 ? model.bi.get(w.slice(-2).join(" ")) : model.uni.get(w[0]);
+  const label = esc(w.slice(-2).join(" "));
+  if (!m) { box.innerHTML = `<div class="note">Nach „${label}“ kam in den Trainingsdaten kein Wort. Das Modell kennt es nicht.</div>`; return; }
+  const list = [...m.entries()].sort((a, b) => b[1] - a[1]);
+  const total = list.reduce((s, x) => s + x[1], 0);
+  box.innerHTML = `<p>Nach „${label}“ kam ${total}-mal ein Wort:</p><div class="tw"><table><thead><tr><th>Wort</th><th class="num">gezählt</th><th class="num">Wahrsch.</th><th></th></tr></thead><tbody>${list.slice(0, 10).map(([x, n]) => `<tr><td class="word">${esc(model.display.get(x) || x)}</td><td class="num">${n}-mal</td><td class="num">${pct(n / total)}</td><td class="barc"><div class="bar" style="width:${(n / list[0][1]) * 100}%"></div></td></tr>`).join("")}</tbody></table></div>${list.length > 10 ? `<p class="hint">… und ${list.length - 10} weitere.</p>` : ""}`;
+}
+
+let flashTimer = null;
+function flash(msg) {
+  const box = $("step");
+  box.innerHTML = `<div class="note">${esc(msg)}</div>`;
+  clearTimeout(flashTimer);
+}
+
+function setData() {
+  $("data").value = [...active].map((k) => PRESETS[k]).join("\n\n");
+}
+
+// --- wiring ---
+const presetBox = $("presets");
+for (const k of Object.keys(PRESETS)) {
+  const b = document.createElement("button");
+  b.textContent = k; b.setAttribute("aria-pressed", "false");
+  b.onclick = () => {
+    if (active.has(k)) active.delete(k); else active.add(k);
+    b.classList.toggle("on", active.has(k)); b.setAttribute("aria-pressed", String(active.has(k)));
+    setData();
+  };
+  presetBox.appendChild(b);
+}
+$("train").onclick = () => {
+  stopAuto();
+  model = train($("data").value);
+  if (model.words < 2) { model = null; $("stats").textContent = "Zu wenig Text. Wähle oben einen Text oder schreib mindestens einen Satz."; return; }
+  let pairs = 0; for (const m of model.uni.values()) pairs += m.size;
+  $("stats").textContent = `Trainiert: ${model.words} Wörter und Zeichen gelesen, ${model.distinct} verschiedene, ${pairs} verschiedene Wortpaare gezählt.`;
+  tokens = []; steps = []; selected = -1; render(); lookup();
+};
+$("clear").onclick = () => { active.clear(); for (const b of presetBox.children) { b.classList.remove("on"); b.setAttribute("aria-pressed", "false"); } $("data").value = ""; };
+$("look").oninput = lookup;
+$("next").onclick = () => { stopAuto(); nextWord(); };
+$("auto").onclick = () => {
+  if (autoTimer) { stopAuto(); return; }
+  if (!model) { flash("Trainiere zuerst das Modell (Schritt 1)."); return; }
+  let n = 0;
+  $("auto").textContent = "Anhalten";
+  autoTimer = setInterval(() => { n++; if (!nextWord() || n >= 30) stopAuto(); }, 700);
+};
+$("reset").onclick = () => { stopAuto(); tokens = []; steps = []; selected = -1; render(); };
+$("start").oninput = () => { stopAuto(); tokens = []; steps = []; selected = -1; render(); };
+const setOrder = (o) => { order = o; $("ctx1").classList.toggle("on", o === 1); $("ctx2").classList.toggle("on", o === 2); $("ctx1").setAttribute("aria-pressed", String(o === 1)); $("ctx2").setAttribute("aria-pressed", String(o === 2)); };
+$("ctx1").onclick = () => setOrder(1);
+$("ctx2").onclick = () => setOrder(2);
+const tempNames = ["0 (immer das häufigste)", "1 (wie gezählt)", "2 (mehr Überraschung)"];
+$("temp").oninput = () => ($("tempv").textContent = tempNames[$("temp").value]);
+$("temp").oninput();
+$("out").addEventListener("click", (e) => { const el = e.target.closest(".w[data-i]"); if (el) { selected = Number(el.dataset.i); render(); } });
+$("out").addEventListener("keydown", (e) => { if ((e.key === "Enter" || e.key === " ") && e.target.dataset.i) { e.preventDefault(); selected = Number(e.target.dataset.i); render(); } });
+
+// Start with the fairy tale selected, so the first tap on "Modell trainieren" already works.
+presetBox.children[0].click();
+render();
+</script>
+</body>
+</html>
